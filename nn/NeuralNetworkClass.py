@@ -2,14 +2,15 @@ import numpy as np
 
 
 class NeuralNetwork:
-    def __init__(self, X, hidden_layers=1):
+    def __init__(self, X, hidden_layers=100):
+        X = X.reshape(X.shape[0] * X.shape[1], X.shape[2])
         size, dim = X.shape
-        self.X = X
-        self.Y = X
-        self.W1 = np.random.rand(size, dim)
+        self.X = X.T / 255
+        self.Y = self.X
+        self.W1 = np.random.rand(size, hidden_layers)
         self.W2 = np.random.rand(hidden_layers, size)
-        self.b1 = np.zeros(hidden_layers, dim)
-        self.b2 = np.zeros(hidden_layers, size)
+        self.b1 = np.zeros((dim, hidden_layers))
+        self.b2 = np.zeros((dim, size))
 
     @staticmethod
     def relu(Z):
@@ -32,6 +33,7 @@ class NeuralNetwork:
         return np.exp(Z) / sum(np.exp(Z))
 
     def forward_propagation(self):
+        print('f p')
         Z1 = np.dot(self.X, self.W1) + self.b1
         A1 = self.relu(Z1)
         # A1 is compressed image
@@ -50,19 +52,19 @@ class NeuralNetwork:
         # d SSR / d B2 = 1/ n * sum(d (act. func) * 2*(Y_obs-Y_pred))
 
         # d SSR / d A1 = 1 / n * sum(W2 * d (act.func) * 2*(Y_obs-Y_pred))
+        print('f p')
+        Y_observed = self.Y
 
-        Y_observed = self.Y.T
-
-        dSSR_dA2 = (1 / Y_observed.shape[0]) * np.sum((-2 * (A2 - Y_observed)))
-        dA2_dZ2 = (1 / Z2.shape[0]) * np.sum(self.relu_derivative(Z2))
-        dZ2_dW2 = (1 / A1.shape[0]) * np.sum(A1)
+        dSSR_dA2 = (1 / Y_observed.size) * np.sum((-2 * (A2 - Y_observed)))
+        dA2_dZ2 = (1 / Z2.size) * np.sum(self.relu_derivative(Z2))
+        dZ2_dW2 = (1 / A1.size) * np.sum(A1)
         dZ2_dB2 = 1
-        dZ2_dA1 = (1 / self.W2.shape[0]) * np.sum(self.W2)
+        dZ2_dA1 = (1 / self.W2.size) * np.sum(self.W2)
 
-        dA1_dZ1 = (1 / Z1.shape[0]) * np.sum(self.relu_derivative(Z1))
-        dZ1_dW1 = (1 / self.X.shape[0]) * np.sum(self.X)
+        dA1_dZ1 = (1 / Z1.size) * np.sum(self.relu_derivative(Z1))
+        dZ1_dW1 = (1 / self.X.size) * np.sum(self.X)
         dZ1_dB1 = 1
-        dZ1_dA0 = (1 / self.W1.shape[0]) * np.sum(self.W1)
+        dZ1_dA0 = (1 / self.W1.size) * np.sum(self.W1)
 
         # does it work?
         dW2 = dSSR_dA2 * dA2_dZ2 * dZ2_dW2
@@ -81,9 +83,9 @@ class NeuralNetwork:
         self.b1 -= learning_rate * dB1
         self.b2 -= learning_rate * dB2
 
-    def gradient_descent(self, X, learning_rate=0.05, iterations=500):
+    def gradient_descent(self, X, learning_rate=0.01, iterations=50):
         for i in range(iterations):
-            Z1, Z2, A1, A2 = self.forward_propagation(X)
+            Z1, Z2, A1, A2 = self.forward_propagation()
             dW1, dW2, dB1, dB2 = self.backward_propagation(Z1, Z2, A1, A2)
             self.update_parameters(dW1, dW2, dB1, dB2, learning_rate=learning_rate)
 
@@ -92,7 +94,18 @@ class NeuralNetwork:
 
     def predict(self):
         _, _, _, A2 = self.forward_propagation()
-        return A2.T
+        return A2.T * 255
+
+
+if __name__ == '__main__':
+    data = np.array([[[23, 45, 109], [0, 23, 23], [1, 0, 0]],
+                     [[56, 89, 10], [23, 76, 87], [100, 10, 0]],
+                     [[9, 7, 199], [23, 65, 63], [34, 45, 67]]])
+    print(data.shape)
+    simple_nn = NeuralNetwork(data, hidden_layers=4)
+    simple_nn.fit()
+    output = simple_nn.predict()
+    print(output)
 
 
 
