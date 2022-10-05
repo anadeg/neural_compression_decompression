@@ -3,14 +3,15 @@ import numpy as np
 
 class NeuralNetwork:
     def __init__(self, X, hidden_layers=100):
-        X = X.reshape(X.shape[0] * X.shape[1], X.shape[2])
-        size, dim = X.shape
-        self.X = X.T / 255
+        self.h, self.w, self.dim = X.shape
+        size = self.h * self.w * self.dim
+        X = X.reshape(1, X.size)
+        self.X = X / 255
         self.Y = self.X
         self.W1 = np.random.rand(size, hidden_layers)
         self.W2 = np.random.rand(hidden_layers, size)
-        self.b1 = np.zeros((dim, hidden_layers))
-        self.b2 = np.zeros((dim, size))
+        self.b1 = np.zeros((1, hidden_layers))
+        self.b2 = np.zeros((1, size))
 
     @staticmethod
     def relu(Z):
@@ -32,17 +33,16 @@ class NeuralNetwork:
     def softmax(Z):
         return np.exp(Z) / sum(np.exp(Z))
 
-    def forward_propagation(self):
-        print('f p')
-        Z1 = np.dot(self.X, self.W1) + self.b1
-        A1 = self.relu(Z1)
+    def forward_propagation(self, X):
+        # print('f p')
+        Z1 = np.dot(X, self.W1) + self.b1
+        A1 = self.leaky_relu(Z1)
         # A1 is compressed image
         # download it
         Z2 = np.dot(A1, self.W2) + self.b2
-        A2 = self.relu(Z2)
-        return Z1, Z2, A1, A2
+        return Z1, Z2, A1
 
-    def backward_propagation(self, Z1, Z2, A1, A2):
+    def backward_propagation(self, Z1, Z2, A1):
         # SSR = np.power(Z2 - Y_predicted, 2)
         # d SSR / d A2 = 2 * (Y_observed - Y_predicted)
         # d A2 / d Z2 = d (activation function) / d Z2
@@ -52,61 +52,53 @@ class NeuralNetwork:
         # d SSR / d B2 = 1/ n * sum(d (act. func) * 2*(Y_obs-Y_pred))
 
         # d SSR / d A1 = 1 / n * sum(W2 * d (act.func) * 2*(Y_obs-Y_pred))
-        print('f p')
+        # print('f p')
         Y_observed = self.Y
 
-        SSE = np.sum(np.power(A2 - Y_observed), 2)
+        # SSE = np.sum(np.power(A2 - Y_observed), 2)
 
-        dSSE_dA2 = -2 * (A2 - Y_observed)
-        dA2_dZ2 = self.relu_derivative(Z2)
-        dZ2_dW2 = A1
-        dZ2_dB2 = 1
-        dZ2_dA1 = self.W2
+        dZ2 = -2 * (Y_observed - Z2)
+        # print(dZ2.shape)
+        dW2 = 1 / dZ2.size * np.dot(A1.T, dZ2)
+        dB2 = 1 / dZ2.size * np.sum(dZ2)
 
-        dA1_dZ1 = self.relu_derivative(Z1)
-        dZ1_dW1 = self.X
-        dZ1_dB1 = 1
-        dZ1_dA0 = self.W1
-
-        # does it work?
-        dW2 = (dZ2_dW2.dot(dA2_dZ2.T)).diagonal() * dSSE_dA2
-        dB2 = dSSE_dA2 * dA2_dZ2 * dZ2_dB2
-        dA1 = dSSE_dA2 * dA2_dZ2 * dZ2_dA1
-
-        dW1 = dA1 * dA1_dZ1 * dZ1_dW1
-        dB1 = dA1 * dA1_dZ1 * dZ1_dB1
-        # dA0 = 1/n * np.sum(dA1 * dA1_dZ1 * dZ1_dA0)
+        dA1 = np.dot(dZ2, self.W2.T)
+        dZ1 = dA1 * self.leaky_relu_derivative(Z1)
+        dW1 = 1 / dZ1.size * np.dot(self.X.T, dZ1)
+        dB1 = 1 / dZ1.size * np.sum(dZ1)
 
         return dW1, dW2, dB1, dB2
 
-    def update_parameters(self, dW1, dW2, dB1, dB2, learning_rate=0.05):
+    def update_parameters(self, dW1, dW2, dB1, dB2, learning_rate=0.01):
         self.W1 -= learning_rate * dW1
         self.W2 -= learning_rate * dW2
         self.b1 -= learning_rate * dB1
         self.b2 -= learning_rate * dB2
 
-    def gradient_descent(self, X, learning_rate=0.01, iterations=50):
+    def gradient_descent(self, learning_rate=0.01, iterations=100):
         for i in range(iterations):
-            Z1, Z2, A1, A2 = self.forward_propagation()
-            dW1, dW2, dB1, dB2 = self.backward_propagation(Z1, Z2, A1, A2)
+            Z1, Z2, A1 = self.forward_propagation(self.X)
+            dW1, dW2, dB1, dB2 = self.backward_propagation(Z1, Z2, A1)
             self.update_parameters(dW1, dW2, dB1, dB2, learning_rate=learning_rate)
 
-    def fit(self, learning_rate=0.05, iterations=500):
-        self.gradient_descent(self.X, learning_rate=learning_rate, iterations=iterations)
+    def fit(self, learning_rate=0.05, iterations=200):
+        self.gradient_descent(learning_rate=learning_rate, iterations=iterations)
 
-    def predict(self):
-        _, _, _, A2 = self.forward_propagation()
-        return A2.T * 255
+    def predict(self, X):
+        X = X.reshape(1, -1) / 255
+        _, Z2, _ = self.forward_propagation(X)
+        return Z2 * 255
 
 
 if __name__ == '__main__':
     data = np.array([[[23, 45, 109], [0, 23, 23], [1, 0, 0]],
                      [[56, 89, 10], [23, 76, 87], [100, 10, 0]],
                      [[9, 7, 199], [23, 65, 63], [34, 45, 67]]])
-    print(data.shape)
-    simple_nn = NeuralNetwork(data, hidden_layers=4)
+    # print(data.shape)
+    simple_nn = NeuralNetwork(data, hidden_layers=9)
     simple_nn.fit()
-    output = simple_nn.predict()
+    output = simple_nn.predict(data)
+    output = output.reshape(3, 3, 3).round()
     print(output)
 
 
