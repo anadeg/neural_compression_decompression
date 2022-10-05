@@ -55,21 +55,23 @@ class NeuralNetwork:
         print('f p')
         Y_observed = self.Y
 
-        dSSR_dA2 = (1 / Y_observed.size) * np.sum((-2 * (A2 - Y_observed)))
-        dA2_dZ2 = (1 / Z2.size) * np.sum(self.relu_derivative(Z2))
-        dZ2_dW2 = (1 / A1.size) * np.sum(A1)
-        dZ2_dB2 = 1
-        dZ2_dA1 = (1 / self.W2.size) * np.sum(self.W2)
+        SSE = np.sum(np.power(A2 - Y_observed), 2)
 
-        dA1_dZ1 = (1 / Z1.size) * np.sum(self.relu_derivative(Z1))
-        dZ1_dW1 = (1 / self.X.size) * np.sum(self.X)
+        dSSE_dA2 = -2 * (A2 - Y_observed)
+        dA2_dZ2 = self.relu_derivative(Z2)
+        dZ2_dW2 = A1
+        dZ2_dB2 = 1
+        dZ2_dA1 = self.W2
+
+        dA1_dZ1 = self.relu_derivative(Z1)
+        dZ1_dW1 = self.X
         dZ1_dB1 = 1
-        dZ1_dA0 = (1 / self.W1.size) * np.sum(self.W1)
+        dZ1_dA0 = self.W1
 
         # does it work?
-        dW2 = dSSR_dA2 * dA2_dZ2 * dZ2_dW2
-        dB2 = dSSR_dA2 * dA2_dZ2 * dZ2_dB2
-        dA1 = dSSR_dA2 * dA2_dZ2 * dZ2_dA1
+        dW2 = (dZ2_dW2.dot(dA2_dZ2.T)).diagonal() * dSSE_dA2
+        dB2 = dSSE_dA2 * dA2_dZ2 * dZ2_dB2
+        dA1 = dSSE_dA2 * dA2_dZ2 * dZ2_dA1
 
         dW1 = dA1 * dA1_dZ1 * dZ1_dW1
         dB1 = dA1 * dA1_dZ1 * dZ1_dB1
