@@ -17,15 +17,14 @@ def save_image(npdata, outfilename):
 class NeuralNetwork:
     def __init__(self, X, hidden_layers=100):
         self.h, self.w, self.dim = X.shape
-        self.size = self.h * self.w * self.dim
+        self.size = self.h * self.w
         self.hidden_layers = hidden_layers
-        X = X.reshape(1, X.size)
-        self.X = X / 255
+        self.X = X.reshape(self.size, self.dim) / 255
         self.Y = self.X
-        self.W1 = np.random.rand(self.size, hidden_layers) / (10**4)
-        self.W2 = np.random.rand(hidden_layers, self.size) / (10**4)
-        self.b1 = np.zeros((1, hidden_layers))
-        self.b2 = np.zeros((1, self.size))
+        self.W1 = np.random.rand(hidden_layers, self.size) / (10**3)
+        self.W2 = np.random.rand(self.size, hidden_layers) / (10**3)
+        self.b1 = np.zeros((hidden_layers, 1))
+        self.b2 = np.zeros((self.size, 1))
 
     @staticmethod
     def relu(Z):
@@ -48,9 +47,9 @@ class NeuralNetwork:
         return np.exp(Z) / sum(np.exp(Z))
 
     def forward_propagation(self, X):
-        Z1 = np.dot(X, self.W1) + self.b1
+        Z1 = np.dot(self.W1, X) + self.b1
         A1 = self.leaky_relu(Z1)
-        Z2 = np.dot(A1, self.W2) + self.b2
+        Z2 = np.dot(self.W2, A1) + self.b2
 
         return Z1, Z2, A1
 
@@ -58,13 +57,13 @@ class NeuralNetwork:
         Y_observed = self.Y
 
         dZ2 = (Z2 - Y_observed)
-        dW2 = 1 / self.size * np.dot(A1.T, dZ2)
-        dB2 = 1/ self.size * np.sum(dZ2, axis=0)
+        dW2 = np.dot(dZ2, A1.T)     # (60000, 3) dot (3, 1800)
+        dB2 = np.sum(dZ2, axis=1).reshape(-1, 1)
 
-        dA1 = np.dot(dZ2, self.W2.T)
+        dA1 = np.dot(self.W2.T, dZ2)
         dZ1 = dA1 * self.leaky_relu_derivative(Z1)
-        dW1 = 1 / self.hidden_layers * np.dot(self.X.T, dZ1)
-        dB1 = 1 / self.hidden_layers * np.sum(dZ1, axis=0)
+        dW1 = np.dot(dZ1, self.X.T)  # (1800, 3) dot (60000, 3).T
+        dB1 = np.sum(dZ1, axis=1).reshape(-1, 1)
 
         return dW1, dW2, dB1, dB2
 
@@ -75,16 +74,18 @@ class NeuralNetwork:
         self.b2 = self.b2 - learning_rate * dB2
 
     def gradient_descent(self, learning_rate=0.001, iterations=100):
-        for i in range(iterations):
+        for i in range(1, iterations+1):
+            if i % 10 == 0:
+                print(f'{i}-th iteration')
             Z1, Z2, A1 = self.forward_propagation(self.X)
             dW1, dW2, dB1, dB2 = self.backward_propagation(Z1, Z2, A1)
             self.update_parameters(dW1, dW2, dB1, dB2, learning_rate=learning_rate)
 
-    def fit(self, learning_rate=0.01, iterations=100):
+    def fit(self, learning_rate=0.001, iterations=150):
         self.gradient_descent(learning_rate=learning_rate, iterations=iterations)
 
     def predict(self, X):
-        X = X.reshape(1, -1) / 255
+        X = X.reshape(self.size, self.dim) / 255
         _, Z2, _ = self.forward_propagation(X)
         Z2 = np.where(Z2 >= 0, Z2, 0)
         Z2 = Z2.reshape(self.h, self.w, self.dim)
