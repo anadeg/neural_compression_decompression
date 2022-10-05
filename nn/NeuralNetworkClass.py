@@ -34,31 +34,15 @@ class NeuralNetwork:
         return np.exp(Z) / sum(np.exp(Z))
 
     def forward_propagation(self, X):
-        # print('f p')
         Z1 = np.dot(X, self.W1) + self.b1
         A1 = self.leaky_relu(Z1)
-        # A1 is compressed image
-        # download it
         Z2 = np.dot(A1, self.W2) + self.b2
         return Z1, Z2, A1
 
     def backward_propagation(self, Z1, Z2, A1):
-        # SSR = np.power(Z2 - Y_predicted, 2)
-        # d SSR / d A2 = 2 * (Y_observed - Y_predicted)
-        # d A2 / d Z2 = d (activation function) / d Z2
-        # d Z2 / d W2 = A1
-        # d SSR / d W2 = 1/ n * sum (d SSR / d W2)
-
-        # d SSR / d B2 = 1/ n * sum(d (act. func) * 2*(Y_obs-Y_pred))
-
-        # d SSR / d A1 = 1 / n * sum(W2 * d (act.func) * 2*(Y_obs-Y_pred))
-        # print('f p')
         Y_observed = self.Y
 
-        # SSE = np.sum(np.power(A2 - Y_observed), 2)
-
         dZ2 = -2 * (Y_observed - Z2)
-        # print(dZ2.shape)
         dW2 = 1 / dZ2.size * np.dot(A1.T, dZ2)
         dB2 = 1 / dZ2.size * np.sum(dZ2)
 
@@ -94,7 +78,6 @@ if __name__ == '__main__':
     data = np.array([[[23, 45, 109], [0, 23, 23], [1, 0, 0]],
                      [[56, 89, 10], [23, 76, 87], [100, 10, 0]],
                      [[9, 7, 199], [23, 65, 63], [34, 45, 67]]])
-    # print(data.shape)
     simple_nn = NeuralNetwork(data, hidden_layers=9)
     simple_nn.fit()
     output = simple_nn.predict(data)
