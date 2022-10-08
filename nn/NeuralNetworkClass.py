@@ -20,12 +20,12 @@ class NeuralNetwork:
         self.h, self.w, self.dim = X.shape
         self.size = self.h * self.w
         self.hidden_layers = hidden_layers
-        self.X = X.reshape(self.size, self.dim)
+        self.X = X.reshape(self.size, self.dim) / 255
         self.Y = self.X
-        self.W1 = np.random.rand(hidden_layers, self.size) / self.coefficient
-        self.W2 = np.random.rand(self.size, hidden_layers) / self.coefficient
-        self.b1 = np.zeros((hidden_layers, 1)) / self.coefficient
-        self.b2 = np.zeros((self.size, 1)) / self.coefficient
+        self.W1 = np.random.randn(hidden_layers, self.size)  # / self.coefficient
+        self.W2 = np.random.randn(self.size, hidden_layers)   # / self.coefficient
+        self.b1 = np.zeros((hidden_layers, 1)) # / self.coefficient
+        self.b2 = np.zeros((self.size, 1)) # / self.coefficient
 
     @staticmethod
     def relu(Z):
@@ -44,12 +44,34 @@ class NeuralNetwork:
         return np.where(Z >= 0, 1, 0.1)
 
     @staticmethod
+    def sigmoid(Z):
+        return 1 / (1 + np.exp(-Z))
+
+    @staticmethod
+    def sigmoid_derivative(Z):
+        return NeuralNetwork.sigmoid(Z) * (1 - NeuralNetwork.sigmoid(Z))
+
+    @staticmethod
+    def tanh(Z):
+        return (np.exp(Z) - np.exp(-Z)) / (np.exp(Z) + np.exp(-Z))
+
+    @staticmethod
+    def tanh_derivative(Z):
+        return 1 - np.power(NeuralNetwork.tanh(Z), 2)
+
+    @staticmethod
     def softmax(Z):
-        return np.exp(Z) / sum(np.exp(Z))
+        return np.exp(Z) / np.sum(Z, axis=1)
+
+    @staticmethod
+    def softmax_derivative(Z):
+        pass
 
     def forward_propagation(self, X):
         Z1 = np.dot(self.W1, X) + self.b1
-        A1 = self.leaky_relu(Z1)
+        # A1 = self.leaky_relu(Z1)
+        # A1 = self.sigmoid(Z1)
+        A1 = self.tanh(Z1)
         Z2 = np.dot(self.W2, A1) + self.b2
 
         return Z1, Z2, A1
@@ -62,7 +84,9 @@ class NeuralNetwork:
         dB2 = 1 / dZ2.shape[1] * np.sum(dZ2, axis=1).reshape(-1, 1)
 
         dA1 = np.dot(self.W2.T, dZ2)
-        dZ1 = dA1 * self.leaky_relu_derivative(Z1)
+        # dZ1 = dA1 * self.leaky_relu_derivative(Z1)
+        # dZ1 = dA1 * self.sigmoid_derivative(Z1)
+        dZ1 = dA1 * self.tanh_derivative(Z1)
         dW1 = np.dot(dZ1, self.X.T)  # (1800, 3) dot (60000, 3).T
         dB1 = 1 / dZ1.shape[1] * np.sum(dZ1, axis=1).reshape(-1, 1)
 
@@ -78,7 +102,7 @@ class NeuralNetwork:
         self.b1 = self.b1 - tempB1
         self.b2 = self.b2 - tempB2
 
-    def gradient_descent(self, learning_rate=0.001, iterations=100):
+    def gradient_descent(self, learning_rate=0.001, iterations=50):
         for i in range(1, iterations+1):
             if i % 5 == 0:
                 print(f'{i}-th iteration')
@@ -86,15 +110,15 @@ class NeuralNetwork:
             dW1, dW2, dB1, dB2 = self.backward_propagation(Z1, Z2, A1)
             self.update_parameters(dW1, dW2, dB1, dB2, learning_rate=learning_rate)
 
-    def fit(self, learning_rate=10**(-12), iterations=100):
+    def fit(self, learning_rate=10**(-3), iterations=50):
         self.gradient_descent(learning_rate=learning_rate, iterations=iterations)
 
     def predict(self, X):
-        X = X.reshape(self.size, self.dim)
+        X = X.reshape(self.size, self.dim) / 255
         _, Z2, _ = self.forward_propagation(X)
         Z2 = np.where(Z2 >= 0, Z2, 0)
         Z2 = Z2.reshape(self.h, self.w, self.dim)
-        Z2 = np.round(Z2)
+        Z2 = np.round(255 * Z2)
         return Z2
 
 
