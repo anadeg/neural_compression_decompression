@@ -10,20 +10,22 @@ def load_image(infilename):
 
 
 def save_image(npdata, outfilename):
-    img = Image.fromarray(np.asarray(np.clip(npdata, 0, 255), dtype="uint8"), "L")
-    img.save(outfilename)
+    # npdata = np.asarray(npdata, dtype=np.float32)
+    img = Image.fromarray(npdata.astype('uint8'), mode="RGB")
+    # img.save(outfilename)
+    img.show()
 
 
 class NeuralNetwork:
     def __init__(self, X, hidden_layers=100):
-        self.coefficient = 10**4
+        self.coefficient = (1/1)*10**1
         self.h, self.w, self.dim = X.shape
         self.size = self.h * self.w
         self.hidden_layers = hidden_layers
         self.X = X.reshape(self.size, self.dim) / 255
         self.Y = self.X
-        self.W1 = np.random.randn(hidden_layers, self.size)  # / self.coefficient
-        self.W2 = np.random.randn(self.size, hidden_layers)   # / self.coefficient
+        self.W1 = (np.random.random((hidden_layers, self.size)) - 0.5) / self.coefficient
+        self.W2 = (np.random.random((self.size, hidden_layers)) - 0.5) / self.coefficient
         self.b1 = np.zeros((hidden_layers, 1)) # / self.coefficient
         self.b2 = np.zeros((self.size, 1)) # / self.coefficient
 
@@ -37,11 +39,19 @@ class NeuralNetwork:
 
     @staticmethod
     def leaky_relu(Z):
-        return np.maximum(0.1*Z, Z)
+        return np.maximum(0.2*Z, Z)
 
     @staticmethod
     def leaky_relu_derivative(Z):
         return np.where(Z >= 0, 1, 0.1)
+
+    @staticmethod
+    def parametric_relu(Z):
+        return np.where(Z >= 0, 0.01*Z, 0.001*Z)
+
+    @staticmethod
+    def parametric_relu_derivative(Z):
+        return np.where(Z >= 0, 0.01, -0.001)
 
     @staticmethod
     def sigmoid(Z):
@@ -60,33 +70,47 @@ class NeuralNetwork:
         return 1 - np.power(NeuralNetwork.tanh(Z), 2)
 
     @staticmethod
-    def softmax(Z):
-        return np.exp(Z) / np.sum(Z, axis=1)
+    def stable_softmax(Z):
+        x = Z - np.max(Z, axis=-1, keepdims=True)
+        numerator = np.exp(x)
+        denominator = np.sum(numerator, axis=-1, keepdims=True)
+        # denominator = denominator.reshape(denominator.size, 1)
+        return np.exp(x) / denominator
 
     @staticmethod
-    def softmax_derivative(Z):
+    def stable_softmax_derivative(Z):
         pass
 
     def forward_propagation(self, X):
         Z1 = np.dot(self.W1, X) + self.b1
-        # A1 = self.leaky_relu(Z1)
+        A1 = self.leaky_relu(Z1)
         # A1 = self.sigmoid(Z1)
-        A1 = self.tanh(Z1)
+        # A1 = self.tanh(Z1)
+        # A1 = self.parametric_relu(Z1)
         Z2 = np.dot(self.W2, A1) + self.b2
+        # A2 = self.stable_softmax(Z2)
+        A2 = self.sigmoid(Z2)
+        # A2 = self.tanh(Z2)
+        # A2 = self.leaky_relu(Z2)
 
-        return Z1, Z2, A1
+        return Z1, Z2, A1, A2
 
-    def backward_propagation(self, Z1, Z2, A1):
+    def backward_propagation(self, Z1, Z2, A1, A2):
         Y_observed = self.Y
 
-        dZ2 = (Z2 - Y_observed)
+        dA2 = A2 - Y_observed
+        dZ2 = dA2 * self.sigmoid_derivative(Z2)
+        # dZ2 = self.leaky_relu_derivative(Z2)
+        # dZ2 = dA2 * self.tanh_derivative(Z2)
+        # dZ2 = A2 - Y_observed
         dW2 = np.dot(dZ2, A1.T)     # (60000, 3) dot (3, 1800)
         dB2 = 1 / dZ2.shape[1] * np.sum(dZ2, axis=1).reshape(-1, 1)
 
         dA1 = np.dot(self.W2.T, dZ2)
-        # dZ1 = dA1 * self.leaky_relu_derivative(Z1)
+        dZ1 = dA1 * self.leaky_relu_derivative(Z1)
         # dZ1 = dA1 * self.sigmoid_derivative(Z1)
-        dZ1 = dA1 * self.tanh_derivative(Z1)
+        # dZ1 = dA1 * self.tanh_derivative(Z1)
+        # dZ1 = dA1 * self.parametric_relu_derivative(Z1)
         dW1 = np.dot(dZ1, self.X.T)  # (1800, 3) dot (60000, 3).T
         dB1 = 1 / dZ1.shape[1] * np.sum(dZ1, axis=1).reshape(-1, 1)
 
@@ -102,41 +126,42 @@ class NeuralNetwork:
         self.b1 = self.b1 - tempB1
         self.b2 = self.b2 - tempB2
 
-    def gradient_descent(self, learning_rate=0.001, iterations=50):
+    def gradient_descent(self, learning_rate=0.001, iterations=30):
         for i in range(1, iterations+1):
             if i % 5 == 0:
                 print(f'{i}-th iteration')
-            Z1, Z2, A1 = self.forward_propagation(self.X)
-            dW1, dW2, dB1, dB2 = self.backward_propagation(Z1, Z2, A1)
+            Z1, Z2, A1, A2 = self.forward_propagation(self.X)
+            dW1, dW2, dB1, dB2 = self.backward_propagation(Z1, Z2, A1, A2)
             self.update_parameters(dW1, dW2, dB1, dB2, learning_rate=learning_rate)
 
-    def fit(self, learning_rate=10**(-3), iterations=50):
+    def fit(self, learning_rate=1*10**(-4), iterations=75):
         self.gradient_descent(learning_rate=learning_rate, iterations=iterations)
 
     def predict(self, X):
         X = X.reshape(self.size, self.dim) / 255
-        _, Z2, _ = self.forward_propagation(X)
-        Z2 = np.where(Z2 >= 0, Z2, 0)
-        Z2 = Z2.reshape(self.h, self.w, self.dim)
-        Z2 = np.round(255 * Z2)
-        return Z2
+        _, _, _, A2 = self.forward_propagation(X)
+        # A2 = np.where(A2 >= 0, A2, 0)
+        A2 = A2.reshape(self.h, self.w, self.dim)
+        A2 = np.round(255 * A2)
+        return A2
 
 
 if __name__ == '__main__':
     # data = np.array([[[23, 45, 109], [0, 23, 23], [1, 0, 0]],
     #                  [[56, 89, 10], [23, 76, 87], [100, 10, 0]],
     #                  [[9, 7, 199], [23, 65, 63], [34, 45, 67]]])
-    # data = load_image('../imgs/sample_2.bmp')
-    data = np.random.randint(255, size=(300, 200, 3))
+    data = load_image('../imgs/kitten.jpg')
+    # data = np.random.randint(255, size=(300, 200, 3))
     # print(data, '\n\n=====================\n')
-    simple_nn = NeuralNetwork(data, hidden_layers=30*20*3)
+    simple_nn = NeuralNetwork(data, hidden_layers=20*12*3)
     simple_nn.fit()
     output = simple_nn.predict(data)
     print(data[:5, :5])
     print(output[:5, :5])
     # # output = np.where(output >= 0, output, 0)
     # # output = output.reshape(3, 3, 3).round()
-    # save_image(output, '../imgs/sample_2_output.bmp')
+    # save_image(data, 'ffkfk')
+    save_image(output, '../imgs/kitten_output.bmp')
 
 
 
