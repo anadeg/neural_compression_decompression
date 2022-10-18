@@ -9,9 +9,9 @@ def load_image(infilename):
     return data
 
 
-def save_image(npdata, outfilename):
+def save_image(npdata, mode, outfilename):
     # npdata = np.asarray(npdata, dtype=np.float32)
-    img = Image.fromarray(npdata.astype('uint8'), mode="RGB")
+    img = Image.fromarray(npdata.astype('uint8'), mode=mode)
     # img.save(outfilename)
     img.show()
 
@@ -24,10 +24,17 @@ class NeuralNetwork:
         self.hidden_layers = hidden_layers
         self.X = X.reshape(self.size, self.dim) / 255
         self.Y = self.X
-        self.W1 = (np.random.random((hidden_layers, self.size)) - 0.5) / self.coefficient
-        self.W2 = (np.random.random((self.size, hidden_layers)) - 0.5) / self.coefficient
-        self.b1 = np.zeros((hidden_layers, 1)) # / self.coefficient
-        self.b2 = np.zeros((self.size, 1)) # / self.coefficient
+        # self.W1 = (np.random.random((hidden_layers, self.size)) - 0.5) / self.coefficient
+        # self.W2 = (np.random.random((self.size, hidden_layers)) - 0.5) / self.coefficient
+        self.W1 = self.he_initialization(self.size, hidden_layers, self.size)
+        self.W2 = self.he_initialization(self.hidden_layers, self.size, hidden_layers)
+        self.b1 = np.zeros((hidden_layers, 1))
+        self.b2 = np.zeros((self.size, 1))
+
+    @staticmethod
+    def he_initialization(l_1_size, rows, cols):
+        # print(size)
+        return np.random.randn(rows, cols) * np.sqrt(2/l_1_size)
 
     @staticmethod
     def relu(Z):
@@ -39,7 +46,7 @@ class NeuralNetwork:
 
     @staticmethod
     def leaky_relu(Z):
-        return np.maximum(0.2*Z, Z)
+        return np.maximum(0.1*Z, Z)
 
     @staticmethod
     def leaky_relu_derivative(Z):
@@ -92,6 +99,7 @@ class NeuralNetwork:
         A2 = self.sigmoid(Z2)
         # A2 = self.tanh(Z2)
         # A2 = self.leaky_relu(Z2)
+        # A2 = np.copy(Z2)
 
         return Z1, Z2, A1, A2
 
@@ -103,7 +111,7 @@ class NeuralNetwork:
         # dZ2 = self.leaky_relu_derivative(Z2)
         # dZ2 = dA2 * self.tanh_derivative(Z2)
         # dZ2 = A2 - Y_observed
-        dW2 = np.dot(dZ2, A1.T)     # (60000, 3) dot (3, 1800)
+        dW2 = np.dot(dZ2, A1.T)
         dB2 = 1 / dZ2.shape[1] * np.sum(dZ2, axis=1).reshape(-1, 1)
 
         dA1 = np.dot(self.W2.T, dZ2)
@@ -111,7 +119,7 @@ class NeuralNetwork:
         # dZ1 = dA1 * self.sigmoid_derivative(Z1)
         # dZ1 = dA1 * self.tanh_derivative(Z1)
         # dZ1 = dA1 * self.parametric_relu_derivative(Z1)
-        dW1 = np.dot(dZ1, self.X.T)  # (1800, 3) dot (60000, 3).T
+        dW1 = np.dot(dZ1, self.X.T)
         dB1 = 1 / dZ1.shape[1] * np.sum(dZ1, axis=1).reshape(-1, 1)
 
         return dW1, dW2, dB1, dB2
@@ -134,34 +142,39 @@ class NeuralNetwork:
             dW1, dW2, dB1, dB2 = self.backward_propagation(Z1, Z2, A1, A2)
             self.update_parameters(dW1, dW2, dB1, dB2, learning_rate=learning_rate)
 
-    def fit(self, learning_rate=1*10**(-4), iterations=75):
+    def fit(self, learning_rate=2*10**(-4), iterations=50):
         self.gradient_descent(learning_rate=learning_rate, iterations=iterations)
 
     def predict(self, X):
         X = X.reshape(self.size, self.dim) / 255
-        _, _, _, A2 = self.forward_propagation(X)
+        _, _, A1, A2 = self.forward_propagation(X)
         # A2 = np.where(A2 >= 0, A2, 0)
+
+        # A1 = A1.reshape(30, 20, 3)
+        # A1 = np.round(255 * A1)
+        # save_image(A1, "RGB", 's')
+
         A2 = A2.reshape(self.h, self.w, self.dim)
         A2 = np.round(255 * A2)
+        # save_image(A2, "RGB", 's')
         return A2
 
 
 if __name__ == '__main__':
-    # data = np.array([[[23, 45, 109], [0, 23, 23], [1, 0, 0]],
-    #                  [[56, 89, 10], [23, 76, 87], [100, 10, 0]],
-    #                  [[9, 7, 199], [23, 65, 63], [34, 45, 67]]])
-    data = load_image('../imgs/kitten.jpg')
+    data = load_image('../imgs/flower.jpg')
     # data = np.random.randint(255, size=(300, 200, 3))
     # print(data, '\n\n=====================\n')
-    simple_nn = NeuralNetwork(data, hidden_layers=20*12*3)
+
+    simple_nn = NeuralNetwork(data, hidden_layers=30*20)
     simple_nn.fit()
     output = simple_nn.predict(data)
     print(data[:5, :5])
     print(output[:5, :5])
+
     # # output = np.where(output >= 0, output, 0)
     # # output = output.reshape(3, 3, 3).round()
-    # save_image(data, 'ffkfk')
-    save_image(output, '../imgs/kitten_output.bmp')
+    # save_image(data, "RGBA", 'ffkfk')
+    save_image(output, "RGB", '../imgs/kitten_output.bmp')
 
 
 
