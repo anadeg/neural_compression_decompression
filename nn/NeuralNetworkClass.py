@@ -22,14 +22,29 @@ class NeuralNetwork:
         self.h, self.w, self.dim = X.shape
         self.size = self.h * self.w
         self.hidden_layers = hidden_layers
-        self.X = X.reshape(self.size, self.dim) / 255
+        # change x
+        # self.X = X.reshape(self.size, self.dim) / 255
+        # self.X = X.reshape(self.size, self.dim)
+        self.X = X
         self.Y = self.X
-        # self.W1 = (np.random.random((hidden_layers, self.size)) - 0.5) / self.coefficient
-        # self.W2 = (np.random.random((self.size, hidden_layers)) - 0.5) / self.coefficient
         self.W1 = self.he_initialization(self.size, hidden_layers, self.size)
         self.W2 = self.he_initialization(self.hidden_layers, self.size, hidden_layers)
         self.b1 = np.zeros((hidden_layers, 1))
         self.b2 = np.zeros((self.size, 1))
+
+    def compress(self):
+        self.c_coeff = 4
+        new_h, new_w = self.h // self.c_coeff, self.w // self.c_coeff
+        new_x = np.zeros((new_h, new_w, self.dim))
+        for i in range(new_h):
+            for j in range(new_w):
+                for d in range(self.dim):
+                    start_i = self.c_coeff * i
+                    start_j = self.c_coeff * j
+                    temp = self.X[start_i: start_i + self.c_coeff, start_j: start_j + self.c_coeff, d]
+                    value = temp.mean()
+                    new_x[i, j, d] = value
+        return new_x
 
     @staticmethod
     def he_initialization(l_1_size, rows, cols):
@@ -161,20 +176,28 @@ class NeuralNetwork:
 
 
 if __name__ == '__main__':
-    data = load_image('../imgs/flower.jpg')
-    # data = np.random.randint(255, size=(300, 200, 3))
-    # print(data, '\n\n=====================\n')
+    # data = load_image('../imgs/flower.jpg')
+    # # data = np.random.randint(255, size=(300, 200, 3))
+    # # print(data, '\n\n=====================\n')
+    #
+    # simple_nn = NeuralNetwork(data, hidden_layers=30*20)
+    # simple_nn.fit()
+    # output = simple_nn.predict(data)
+    # print(data[:5, :5])
+    # print(output[:5, :5])
+    #
+    # # # output = np.where(output >= 0, output, 0)
+    # # # output = output.reshape(3, 3, 3).round()
+    # # save_image(data, "RGBA", 'ffkfk')
+    # save_image(output, "RGB", '../imgs/kitten_output.bmp')
 
-    simple_nn = NeuralNetwork(data, hidden_layers=30*20)
-    simple_nn.fit()
-    output = simple_nn.predict(data)
-    print(data[:5, :5])
-    print(output[:5, :5])
-
-    # # output = np.where(output >= 0, output, 0)
-    # # output = output.reshape(3, 3, 3).round()
-    # save_image(data, "RGBA", 'ffkfk')
-    save_image(output, "RGB", '../imgs/kitten_output.bmp')
+    data_test = np.array([[[1, 1], [2, 1], [3, 1], [4, 1], [2, 2], [3, 2], [4, 2], [5, 2]],
+                          [[2, 1], [3, 1], [4, 1], [1, 1], [1, 2], [1, 2], [0, 2], [1, 2]],
+                          [[3, 1], [3, 1], [1, 1], [1, 1], [0, 2], [0, 2], [1, 2], [3, 2]],
+                          [[8, 1], [5, 1], [6, 1], [4, 1], [3, 2], [2, 2], [2, 2], [1, 2]]])
+    test_nn = NeuralNetwork(data_test, hidden_layers=10)
+    # print(data_test[[2, 2, 0], [0, 4, 0]])
+    n_d_test = test_nn.compress()
 
 
 
